@@ -82,13 +82,15 @@ If you have installed openCARP as a docker container you will already have mesht
     
     conda activate pointpicking
     
-    python -m pip install pyvista==0.38.5
+    python -m pip install pyvista==0.42.2
+    
+    python -m pip install vtk==9.2.6
     
 (you will then be able to run the code using: python Rough_Point_Picking.py)
 
 1b. **Universal Atrial Coordinates (UAC) environment:** 
     
-cd to src/3Processing/UAC_Codes/UAC_Codes-refactorisation
+cd to src/3Processing/UAC_Codes/
     
     conda env create -f environment.yml
     
