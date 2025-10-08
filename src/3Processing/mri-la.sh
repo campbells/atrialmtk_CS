@@ -36,9 +36,9 @@ docker run --rm --volume="$LAPath":/shared:z --workdir=/shared docker.opencarp.o
 
 docker run --rm --volume="$LAPath":/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest meshtool resample surfmesh -msh=Labelled -avrg=300 -outmsh=Labelled -surf_corr=0.95
 
-docker run --rm --volume="$LAPath":/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest meshtool clean topology -msh=Labelled -outmsh=Labelled
+#docker run --rm --volume="$LAPath":/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest meshtool clean topology -msh=Labelled -outmsh=Labelled
 
-docker run --rm --volume="$LAPath":/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest meshtool clean quality -msh=Labelled -thr=0.5 -outmsh=Labelled
+#docker run --rm --volume="$LAPath":/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest meshtool clean quality -msh=Labelled -thr=0.5 -outmsh=Labelled
 
 #stage 6 
 python $PROJECT/scripts/labels_la_1.py "$LAPath/" "$PROJECT/fibre_files/ra/endo/" "$PROJECT/laplace_files/" Labelled $PVLabelT $LAALabelT $RegionLA $UnitsRescale
