@@ -40,9 +40,9 @@ docker run --rm --volume="$RAPath":/shared:z --workdir=/shared docker.opencarp.o
 
 docker run --rm --volume="$RAPath":/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest meshtool resample surfmesh -msh=Labelled -avrg=300 -outmsh=Labelled -surf_corr=0.95
 
-docker run --rm --volume="$RAPath":/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest meshtool clean topology -msh=Labelled -outmsh=Labelled
+#docker run --rm --volume="$RAPath":/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest meshtool clean topology -msh=Labelled -outmsh=Labelled
 
-docker run --rm --volume="$RAPath":/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest meshtool clean quality -msh=Labelled -thr=0.5 -outmsh=Labelled
+#docker run --rm --volume="$RAPath":/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest meshtool clean quality -msh=Labelled -thr=0.5 -outmsh=Labelled
 
 
 
