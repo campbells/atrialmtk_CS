@@ -2,22 +2,24 @@
 
 **Imaging Data:**
 
-1. Start with an Atrial Challenge Imaging dataset (see ImagingData/Dataset.txt). You should have the raw MRI file lgemri.nrrd and corresponding segmentation mask laendo.nrrd. See Examples/Example-LeftAtrium/0ImagingData
+1. Start with an Atrial Challenge Imaging dataset (see atrialmtk-main/Examples/Dataset.txt for dataset details).
+You can download a raw MRI file lgemri.nrrd and corresponding segmentation mask laendo.nrrd.
+Put these in a new folder: Examples/Example-LeftAtrium/0ImagingData
+
+2. These files can be visualised using different software including 3DSlicer, CemrgApp, itksnap (e.g. in itksnap: do “File/load main image” - lgemri.nrrd, “Segmentation/load segmentation” - laendo.nrrd, “update”)
+3. They can also be exported as surface meshes (.vtk format) using any of these software. For the next step of the pipeline (Clipping), you need to open the segmentation mask (e.g. laendo.nrrd) and export it as a .vtk file (segmented.vtk). 
     
-    These files can be visualised using different software including 3DSlicer, CemrgApp, itksnap (e.g. in itksnap: do “File/load main image” - lgemri.nrrd, “Segmentation/load segmentation” - laendo.nrrd, “update”)
-    
-    They can also be exported as surface meshes (.vtk format) using any of these software. 
-    
-    E.g. itksnap:
+    E.g. Exporting to a surface mesh using itksnap:
 
    ![itk-snap](https://github.com/pcmlab/atrialmtk/blob/main/images/itk-snap-LA.png?raw=true)
 
     
+Note: this step can be skipped if already have the segmentation in vtk format (see Examples/Example-LeftAtrium/1Clipping/LA_Mesh1)
 
 **Clipping**
 
-1. Set up the folder Examples/Example-LeftAtrium/1Clipping/LA_mesh1, and copy across the data from Examples/Example-LeftAtrium/0ImagingData
-2. Load segmented.vtk in paraview and open the mesh by clipping it at the pulmonary veins and mitral valve, extracting the surface after each clip. If you open the state file Clips.pvsm with the provided segmented.vtk file (use the 'Search names under specified directory' option); you should be able to see the sphere clippers that we used to clip the veins/valve in the example (and in the figures below). 
+1. Set up the folder Examples/Example-LeftAtrium/1Clipping/LA_mesh1, and copy across the resultant segmentation mask (vtk) from Examples/Example-LeftAtrium/0ImagingData to Examples/Example-LeftAtrium/1Clipping/LA_Mesh1. This file is already provided for this example for those not working from the raw imaging data (see Examples/Example-LeftAtrium/1Clipping/LA_Mesh1).
+2. Load segmented.vtk in paraview and open the mesh by clipping it at the pulmonary veins and mitral valve, extracting the surface after each clip. If you load the state file Clips.pvsm with the provided segmented.vtk file (use the 'Search names under specified directory' option); you should be able to see the sphere clippers that we used to clip the veins/valve in the example (and in the figures below). 
 3. Triangulate and extract the final surface, and save it as Clipped.stl, which you will also be able to open and view in paraview. This will be the input for the landmarking step.
         
     Clip1 (Clips.pvsm): right supervior pulmonary vein
@@ -59,14 +61,14 @@
     ```
 ![pyvista-regions](https://github.com/pcmlab/atrialmtk/blob/main/images/la-regions-pyvista.png?raw=true)    
     
-7. Follow the steps for “general point picking” from the “Instructions for landmark selection” below. Select the 6 landmarks by right clicking or pressing P with the cursor at the desired location,  making sure to select the points in the same order as listed in the python script, and close the window. The coordinates will be saved automatically in a text file Regions.txt.
+7. Follow the steps for [General point selection](#stargeneral-point-selection) from the “Instructions for landmark selection” below. Select the 6 landmarks by right clicking or pressing P with the cursor at the desired location,  making sure to select the points in the same order as listed in the python script, and close the window. The coordinates will be saved automatically in a text file Regions.txt.
 8. Next, you will need to provide the model with some more specific information. Update DataPath in Refined_Point_Picking.py to match the folder containing Clipped.stl.
 9. With the point picking environment still active, run:
     
     ```
     python Refined_Point_Picking.py
     ```
-    and follow the steps for “specific point selection” in the “Instructions for landmark selection”below to select these 4 additional points. Again make sure to do this in the same order as in the script. These points will need to be selected more carefully, so make sure to read through the steps fully, and make use of the reference images below. When you are finished close the window. You will find these coordinates saved in the text file Landmarks.txt.
+    and follow the steps for [Specific point selection](#starspecific-point-selection) in the “Instructions for landmark selection” below to select these 4 additional points. Again make sure to do this in the same order as in the script. These points will need to be selected more carefully, so make sure to read through the steps fully, and make use of the reference images below. When you are finished close the window. You will find these coordinates saved in the text file Landmarks.txt.
    
    ![pyvista-landmarks](https://github.com/pcmlab/atrialmtk/blob/main/images/la-landmarks-pyvista.png?raw=true)       
   
@@ -116,48 +118,48 @@ docker run --rm --volume=/Volumes/Elements_CR/atrialmtk/Examples/Example-LeftAtr
 **********************************************************************Instructions for landmark selection**********************************************************************
 
 1. **********************************Landmark selection for the left atrium**********************************
+
+## :star:General point selection
     
-    **General point selection**
+First, roughly select a point somewhere on each anatomical landmark that is listed in Rough_Point_Picking.py. If the pulmonary veins are close together, select points on opposite sides of each (i.e. as far from another vein as possible); the script uses these points to assign which vein is which. The LAA tip point is used as a boundary condition location of the Laplace-Dirichlet solve. Make sure to do this in the same order as in the script:
+
+i) Right superior pulmonary vein (RSPV)
+
+ii) Right inferior pulmonary vein (RIPV)
     
-    First, roughly select a point somewhere on each anatomical landmark that is listed in Rough_Point_Picking.py. If the pulmonary veins are close together, select points on opposite sides of each (i.e. as far from another vein as possible); the script uses these points to assign which vein is which. The LAA tip point is used as a boundary condition location of the Laplace-Dirichlet solve. Make sure to do this in the same order as in the script:
+iii) Left inferior pulmonary vein (LIPV)
     
-    i) Right superior pulmonary vein (RSPV)
+iv) Left superior pulmonary vein (LSPV)
     
-    ii) Right inferior pulmonary vein (RIPV)
+v) Left atrial appendage tip (LAA tip)
     
-    iii) Left inferior pulmonary vein (LIPV)
+vi) Left atrial appendage base (LAA base)
     
-    iv) Left superior pulmonary vein (LSPV)
-    
-    v) Left atrial appendage tip (LAA tip)
-    
-    vi) Left atrial appendage base (LAA base)
-    
-    View 1 (general points):
+View 1 (general points):
     ![LA_Regions_roof](https://github.com/pcmlab/atrialmtk/blob/main/images/LA_Regions_roof.png?raw=true) 
     
-    View 2 (general points):
+View 2 (general points):
     ![LA_Regions_LAA](https://github.com/pcmlab/atrialmtk/blob/main/images/LA_Regions_LAA.png?raw=true) 
     
-    **Specific point selection**
+## :star:Specific point selection
     
-    Now select points at specific locations in the following order (as listed in the python script Refined_Point_Picking.py) 
+Now select points at specific locations in the following order (as listed in the python script Refined_Point_Picking.py) 
     
-    i) **On the lateral wall, in line with the LSPV, posterior of the LAA.** A geodesic path is calculated from the bottom of the LSPV ostia to the MV through this point. You want to ensure this path is posterior of the LAA, so that the entire LAA is assigned to the anterior component of the UAC. (The example shown here is a tricky one, often it is easy to select a point further from the LAA.)
+i) **On the lateral wall, in line with the LSPV, posterior of the LAA.** A geodesic path is calculated from the bottom of the LSPV ostia to the MV through this point. You want to ensure this path is posterior of the LAA, so that the entire LAA is assigned to the anterior component of the UAC. (The example shown here is a tricky one, often it is easy to select a point further from the LAA.)
      
-  View 1 (specific points):
+View 1 (specific points):
    ![LA_Landmarks_lateralwall](https://github.com/pcmlab/atrialmtk/blob/main/images/LA_Landmarks_lateralwall.png?raw=true) 
 
-   ii) **On the septal wall, in line with the RSPV.** Similar to the first point, a geodesic path is calculated from the bottom of the RSPV ostia to the MV through this point. This point is also used to assign line connections in the biatrial bilayer connections at the fossa ovalis, so should be chosen accordingly. 
+ii) **On the septal wall, in line with the RSPV.** Similar to the first point, a geodesic path is calculated from the bottom of the RSPV ostia to the MV through this point. This point is also used to assign line connections in the biatrial bilayer connections at the fossa ovalis, so should be chosen accordingly. 
    
-   View 2 (specific points):
+View 2 (specific points):
    ![LA_Landmarks_septalwall](https://github.com/pcmlab/atrialmtk/blob/main/images/LA_Landmarks_septalwall.png?raw=true) 
    
-   iii) **Approximately at the intersection of the LSPV and the body of the LA (i.e. at the ostia), at the centre of the posterior wall path.** The ring of nodes at the ostia is split into two paths from the point on the ostia closest to the RSPV to the highest point (at the roof). This point is used to say which of the paths is on the posterior wall, so should be chosen about midway along the path.  
+iii) **Approximately at the intersection of the LSPV and the body of the LA (i.e. at the ostia), at the centre of the posterior wall path.** The ring of nodes at the ostia is split into two paths from the point on the ostia closest to the RSPV to the highest point (at the roof). This point is used to say which of the paths is on the posterior wall, so should be chosen about midway along the path.  
    
-   View 3 (specific points):
+View 3 (specific points):
    ![LA_Landmarks_roof](https://github.com/pcmlab/atrialmtk/blob/main/images/LA_Landmarks_roof.png?raw=true) 
-    iv) **Approximately at the intersection between the RSPV and the LA (i.e. at the ostia), at the centre of the posterior wall path.**  
+iv) **Approximately at the intersection between the RSPV and the LA (i.e. at the ostia), at the centre of the posterior wall path.**  
 As for point iii, the ring of nodes at the ostia is split into two paths from the point on the ostia closest to the LSPV to the highest point (at the roof). This point is used to say which of the paths is on the posterior wall, so should be chosen about midway along the path.   
     
 The atrial regions will then be identified automatically using Laplace solvers in CARPentry
@@ -165,7 +167,8 @@ The atrial regions will then be identified automatically using Laplace solvers i
 
 ---
 
-**********************************************************************Manual thresholds for region labelling**********************************************************************
+
+## :star:Manual thresholds for region labelling
 
 You need to set the following thresholds in the mri-la.sh script, PVLabelT and LAALabelT. These are used to threshold the Laplace-Dirichlet solves as either PV/LAA tissue or LA tissue. To set these thresholds, you can try different values for the Laplace-Dirichlet solve as demonstrated in these figures. Typically, you can fix these values for a given data type if you have processed the meshes in a similar way. You may need to change if you have a very different LAA morphology.
 
