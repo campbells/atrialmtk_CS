@@ -85,7 +85,7 @@ Note: this step can be skipped if already have the segmentation in vtk format (s
 
 1. Copy the surface Clipped.stl and the coordinate files Regions.txt and Landmarks.txt from Examples/Example-LeftAtrium/2Landmarking/LA_Mesh1 to the processing folder Examples/Example-LeftAtrium/3Processing/LA_Mesh1.
 2. Update the paths in the file **mri-la.sh**, found in the folder src/3Processing, so that PROJECT is the path to the folder containing the universal atrial coordinate (UAC) codes (src/3Processing/UAC_Codes), DATA contains the path to the processing step for the example (Examples/Example-LeftAtrium/3Processing), and ConvertFilesLoc is the path to the python script trans_mod.py (src/3Processing/UAC_Codes).
-3. Set index=1 to correspond to LA_Mesh1 of the Example case, or change it to 2 if you have set up a second version of the example, LA_Mesh2 etc. **There are also two manual thresholds to set in this file: PVLabelT and LAALabelT**, please see the instructions below on how to set these. 
+3. Set index=1 to correspond to LA_Mesh1 of the Example case, or change it to 2 if you have set up a second version of the example, LA_Mesh2 etc. **There are also two manual thresholds to set in this file: PVLabelT and LAALabelT**, please see the instructions below on how to set these ([Manual Threshold Selection](#starmanual-thresholds-for-region-labelling)). We have set these thresholds in the example case to demonstrate a suitable choice for this case.
 4. Follow the steps on the general README for the docker installation of openCARP, in order to run the script mri-la.sh. (You only need to do this step once.)
 5. In order to run mri-la.sh, which automatically separates the surface into its different atrial regions, adds atrial fibres and generates a bilayer model, you will need to create and activate the second conda environment for UAC (follow the steps “1b. Universal Atrial Coordinates (UAC) environment” in the general README). If you have already created this environment, you will only need to activate it:
 
@@ -95,7 +95,7 @@ Note: this step can be skipped if already have the segmentation in vtk format (s
     
     
     
-7. With the uac environment active, cd to the src folder and run mri-la.sh to generate a mesh with regions, fibres, atrial coordinates, and initial conditions. Each stage will produce a number of output files. These can be checked by running the commands from mri-la.sh step-by-step and comparing with the example outputs. (Note you may need to change the permissions for mri-la.sh to allow it to run as an executable e.g. in Linux).
+7. With the uac environment active, cd to the src/3Processing folder and run mri-la.sh to generate a mesh with regions, fibres, atrial coordinates, and initial conditions. Each stage will produce a number of output files. These can be checked by running the commands from mri-la.sh step-by-step and comparing with the example outputs. (Note you may need to change the permissions for mri-la.sh to allow it to run as an executable e.g. in Linux and Mac, e.g. chmod 755 mri-la.sh).
 8. When this code has finished, type: conda deactivate
 9. You can open the meshes in Paraview or meshalyzer and compare to the examples below. 
 
@@ -108,7 +108,7 @@ Please also see notes here if you would like more information on the different s
 **Simulation**
 
 1. From the outputs of the Processing step, you will need the mesh Fibre_l.pts, Fibre_l.elem, the fibre file, Fibre_l.lon, and the LAT field, LAT_Spiral4_B.dat. Copy them from Examples/Example-LeftAtrium/3Processing/LA_Mesh1 to the simulation folder Examples/Example-LeftAtrium/4Simulation/LA_Mesh1
-2. Also copy AF_Simulation.par from src to the Simulation folder.
+2. Also copy AF_Simulation.par from src/4Simulation to the Simulation folder.
 3. Use the following command, updated to have the path to your simulation folder there, to run the simulation step of the model:
 docker run --rm --volume=/Volumes/Elements_CR/atrialmtk/Examples/Example-LeftAtrium/4Simulation/LA_Mesh1:/shared:z --workdir=/shared docker.opencarp.org/opencarp/opencarp:latest openCARP +F AF_Simulation.par -simID AF
 
