@@ -13,7 +13,7 @@ You will need to make sure docker is installed and running on your machine to in
 
 Install docker: https://docs.docker.com/engine/install/
 
-To install with sudo access, please follow these steps post-installation:
+For Linux - to install with sudo access, please follow these steps post-installation:
 
 1. Create the docker group:
 
@@ -86,18 +86,19 @@ If you have installed openCARP as a docker container you will already have mesht
     
     python -m pip install vtk==9.2.6
     
-(you will then be able to run the code using: python Rough_Point_Picking.py)
+(you will then be able to run the code using: python Rough_Point_Picking.py. Once you have finished, type conda deactivate.)
 
 1b. **Universal Atrial Coordinates (UAC) environment:** 
     
-cd to src/3Processing/UAC_Codes/
+Once you have downloaded this github folder, cd to the folder src/3Processing/UAC_Codes/
     
     conda env create -f environment.yml
     
 (Note: the “Collecting package metadata” and “Solving environment” steps take a few minutes each, so the environment may take up to 10 minutes to create)
-    
+
+This step will make the environment called UAC. You then need to activate it to run the UAC codes. 
     conda activate uac
-(if you have already installed openCARP, you will now be able to run mri-la.sh from the src folder using ./mri-la.sh)
+(if you have already installed openCARP, you will now be able to run mri-la.sh from the src folder using ./mri-la.sh. Once you have finished, type conda deactivate.)
     
 
 # **Usage** 
