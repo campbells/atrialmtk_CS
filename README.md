@@ -98,7 +98,7 @@ Once you have downloaded this github folder, cd to the folder src/3Processing/UA
 
 This step will make the environment called UAC. You then need to activate it to run the UAC codes.
     
-    conda activate uac
+    conda activate UAC
 (if you have already installed openCARP, you will now be able to run mri-la.sh from the src folder using ./mri-la.sh. Once you have finished, type conda deactivate.)
     
 
