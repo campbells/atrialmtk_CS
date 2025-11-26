@@ -40,29 +40,10 @@ def _with_sep(path: str) -> str:
     return path if path.endswith(os.sep) else path + os.sep
 
 
-def _derive_landmarks_from_mesh(
-    pts: np.ndarray,
-    nodes_lspv: np.ndarray,
-    nodes_rspv: np.ndarray,
-) -> np.ndarray:
-    """Return synthetic seed points based on PV rim centroids.
-
-    The fitter expects four landmark points. When an explicit seed file is
-    unavailable, we approximate them using the centroids of the left and
-    right superior pulmonary vein rims. The same centroids are reused for the
-    alternative path disambiguation steps because only relative proximity is
-    inspected.
-    """
-
-    lspv_center = pts[nodes_lspv].mean(axis=0)
-    rspv_center = pts[nodes_rspv].mean(axis=0)
-    return np.vstack([lspv_center, rspv_center, lspv_center, rspv_center])
-
-
 def fit_left_atrial_coordinates(
     geometry: str,
     mesh_name: str = "Labelled",
-    seed_file: str | None = None,
+    seed_file: str = "seedsfileOUT_Landmarks.vtk",
     scale_factor: float = 1.0,
     labels: dict[str, int] | None = None,
     output_prefix: str | None = None,
@@ -94,26 +75,18 @@ def fit_left_atrial_coordinates(
     output_prefix = base_dir if output_prefix is None else _with_sep(output_prefix)
     label_cfg = {**DEFAULT_LABELS, **(labels or {})}
 
-    pts_src: np.ndarray | None = None
-    if seed_file:
-        seed_path = seed_file if os.path.isabs(seed_file) else os.path.join(base_dir, seed_file)
-        if os.path.exists(seed_path):
-            pts_src = load_landmarks(seed_path, scale_factor)
-        else:
-            raise FileNotFoundError(f"Seed file not found at {seed_path}. Provide a valid --seed-file or omit it for auto-seeding.")
-    pts, elems, tot_pts, adjacency = read_mesh(geometry_path if is_file else base_dir, mesh_name)
+    seed_path = seed_file if os.path.isabs(seed_file) else os.path.join(base_dir, seed_file)
+    pts_src = load_landmarks(seed_path, scale_factor)
+    pts, elems, tot_pts, surface = read_mesh(geometry_path if is_file else base_dir, mesh_name)
 
     nodes_lspv = find_junction_nodes(elems, label_cfg["la"], label_cfg["lspv"])
     nodes_rspv = find_junction_nodes(elems, label_cfg["la"], label_cfg["rspv"])
     nodes_lipv = find_junction_nodes(elems, label_cfg["la"], label_cfg["lipv"])
     nodes_ripv = find_junction_nodes(elems, label_cfg["la"], label_cfg["ripv"])
 
-    if pts_src is None:
-        pts_src = _derive_landmarks_from_mesh(pts, nodes_lspv, nodes_rspv)
-
     nodes_mv = find_mitral_valve_nodes(elems)
 
-    tot_pts_surface, adjacency_surface = tot_pts, adjacency
+    tot_pts_surface, surface_filter = tot_pts, surface
 
     _, lipv_lspv_2 = boundary_markers(nodes_lipv, nodes_lspv, tot_pts_surface)
     _, ripv_rspv_2 = boundary_markers(nodes_ripv, nodes_rspv, tot_pts_surface)
@@ -197,7 +170,7 @@ def fit_left_atrial_coordinates(
 
     path_rspv = rspv_indices_path if m3 < m4 else rspv_indices_at
 
-    _, path_roof_inds = geodesic_between_points(adjacency_surface, p2, p4, tot_pts_surface)
+    _, path_roof_inds = geodesic_between_points(surface_filter, p2, p4, tot_pts_surface)
     total_roof_inds = np.concatenate([path_lspv, path_roof_inds, path_rspv])
 
     pa_path = os.path.join(output_prefix, "PAbc1.vtx")
@@ -208,8 +181,8 @@ def fit_left_atrial_coordinates(
     lspv_marker = pts_src[0]
     rspv_marker = pts_src[1]
 
-    _, path_lspv_inds = geodesic_between_points(adjacency_surface, lspv_marker, p1, tot_pts_surface)
-    _, path_rspv_inds = geodesic_between_points(adjacency_surface, rspv_marker, p3, tot_pts_surface)
+    _, path_lspv_inds = geodesic_between_points(surface_filter, lspv_marker, p1, tot_pts_surface)
+    _, path_rspv_inds = geodesic_between_points(surface_filter, rspv_marker, p3, tot_pts_surface)
 
     return {
         "mv_boundary": nodes_mv,
@@ -225,11 +198,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Fit Universal Atrial Coordinates to a left atrial mesh")
     parser.add_argument("geometry", help="Path to a CARP mesh directory or an XML surface mesh file")
     parser.add_argument("--mesh-name", default="Labelled", help="Mesh prefix (default: Labelled)")
-    parser.add_argument(
-        "--seed-file",
-        default=None,
-        help="Landmark file used for PV markers (omit to auto-derive from the mesh)",
-    )
+    parser.add_argument("--seed-file", default="seedsfileOUT_Landmarks.vtk", help="Landmark file used for PV markers")
     parser.add_argument("--scale-factor", type=float, default=1.0, help="Optional scaling applied to landmarks")
     parser.add_argument("--la-label", type=int, default=DEFAULT_LABELS["la"], help="Left atrium label")
     parser.add_argument("--lspv-label", type=int, default=DEFAULT_LABELS["lspv"], help="Left superior pulmonary vein label")

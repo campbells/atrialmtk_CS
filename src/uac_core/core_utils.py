@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import os
 import xml.etree.ElementTree as ET
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Iterable, List, Sequence, Tuple
 
 import numpy as np
-import heapq
+import vtk
 
 
 class Edge:
@@ -52,6 +52,10 @@ class Line:
 ELEMINFOS = {"Ln": 2, "Tr": 3, "Qd": 4, "Tt": 4, "Py": 5, "Pr": 6, "Hx": 8}
 # Map number of vertices to CARP surface element
 CARP_SURFACE_TYPES = {2: "Ln", 3: "Tr", 4: "Qd"}
+# Map CARP to VTK element types
+VTK_ELEMENT_TYPES = {"Ln": 3, "Tr": 5, "Qd": 9, "Tt": 10, "Py": 14, "Pr": 13, "Hx": 11}
+
+
 def find_index(values: Sequence[float], selector) -> int:
     target = selector(values)
     for idx, value in enumerate(values):
@@ -65,33 +69,16 @@ def closest_node(node: np.ndarray, nodes: np.ndarray) -> np.ndarray:
     return np.einsum("ij,ij->i", deltas, deltas)
 
 
-def _load_legacy_vtk_points(filepath: str) -> np.ndarray:
-    """Parse a minimal legacy VTK PolyData file containing POINTS."""
-
-    with open(filepath, "r") as f:
-        lines = [line.strip() for line in f.readlines()]
-
-    point_header = None
-    for idx, line in enumerate(lines):
-        if line.startswith("POINTS"):
-            point_header = (idx, int(line.split()[1]))
-            break
-    if point_header is None:
-        raise ValueError(f"POINTS section not found in {filepath}")
-
-    start, count = point_header
-    points = np.empty((count, 3), float)
-    for i in range(count):
-        coords = list(map(float, lines[start + 1 + i].split()))
-        if len(coords) != 3:
-            raise ValueError(f"Invalid coordinate line in {filepath}: {lines[start + 1 + i]}")
-        points[i] = coords
-    return points
-
-
 def load_landmarks(filepath: str, scale_factor: float = 1.0) -> np.ndarray:
     if filepath.endswith(".vtk"):
-        points = _load_legacy_vtk_points(filepath)
+        reader = vtk.vtkPolyDataReader()
+        reader.SetFileName(filepath)
+        reader.Update()
+        polydata = reader.GetOutput()
+        size = polydata.GetNumberOfPoints()
+        points = np.empty((size, 3), float)
+        for i in range(size):
+            points[i] = np.array(polydata.GetPoint(i))
     else:
         points = np.loadtxt(filepath, delimiter=",")
     return points * scale_factor
@@ -121,7 +108,120 @@ def read_elem(prefix: str) -> List[Element]:
     return read_element_file(prefix + ".elem")
 
 
-def _load_fenics_xml_mesh(filename: str) -> Tuple[np.ndarray, List[Element], np.ndarray, Dict[int, list]]:
+def write_vtk(pts: np.ndarray, elems: Sequence[Element], outmesh: str) -> None:
+    with open(outmesh, "w") as outfile:
+        outfile.write("# vtk DataFile Version 2.0\n")
+        outfile.write("converted from a CARP mesh\n")
+        outfile.write("ASCII\n")
+        outfile.write("DATASET UNSTRUCTURED_GRID\n")
+        outfile.write(f"POINTS {len(pts)} float\n")
+        for p in pts:
+            outfile.write(f"{p[0]} {p[1]} {p[2]}\n")
+        outfile.write("\n")
+
+        numcells = sum(ELEMINFOS[e.type] + 1 for e in elems)
+        outfile.write(f"CELLS {len(elems)} {numcells}\n")
+        for e in elems:
+            outfile.write(str(ELEMINFOS[e.type]) + " " + " ".join(map(str, e.n)) + "\n")
+        outfile.write("\n")
+
+        outfile.write(f"CELL_TYPES {len(elems)}\n")
+        for e in elems:
+            outfile.write(str(VTK_ELEMENT_TYPES[e.type]) + "\n")
+        outfile.write("\n")
+
+        outfile.write(f"CELL_DATA {len(elems)}\n")
+        outfile.write("SCALARS region double\n")
+        outfile.write("LOOKUP_TABLE default\n")
+        for e in elems:
+            outfile.write(f"{e.reg}\n")
+        outfile.write("\n")
+
+
+def convert_unstructureddata_to_polydata(surface: vtk.vtkUnstructuredGrid) -> vtk.vtkPolyData:
+    geom = vtk.vtkGeometryFilter()
+    geom.SetInputData(surface)
+    geom.Update()
+    return geom.GetOutput()
+
+
+def build_surface_filter_from_polydata(polydata: vtk.vtkPolyData) -> Tuple[np.ndarray, vtk.vtkDataSetSurfaceFilter]:
+    surface_filter = vtk.vtkDataSetSurfaceFilter()
+    surface_filter.SetInputData(polydata)
+    surface_filter.Update()
+    tot_pts, _ = read_vtk_surface(polydata)
+    return tot_pts, surface_filter
+
+
+def clean_polydata(polydata: vtk.vtkPolyData) -> vtk.vtkPolyData:
+    cleaner = vtk.vtkCleanPolyData()
+    cleaner.SetInputData(polydata)
+    cleaner.Update()
+    return cleaner.GetOutput()
+
+
+def get_vtk_from_file(filename: str) -> vtk.vtkUnstructuredGrid:
+    reader = vtk.vtkUnstructuredGridReader()
+    reader.SetFileName(filename)
+    reader.ReadAllScalarsOn()
+    reader.ReadAllVectorsOn()
+    reader.ReadAllTensorsOn()
+    reader.Update()
+    return reader.GetOutput()
+
+
+def read_vtk_surface(surface: vtk.vtkPolyData) -> Tuple[np.ndarray, vtk.vtkDataSetSurfaceFilter]:
+    surface_filter = vtk.vtkDataSetSurfaceFilter()
+    surface_filter.SetInputData(surface)
+    surface_filter.Update()
+    polydata = surface_filter.GetOutput()
+
+    size = polydata.GetNumberOfPoints()
+    tot_pts = np.empty((size, 3), float)
+    for i in range(size):
+        tot_pts[i] = np.array(polydata.GetPoint(i))
+    return tot_pts, surface_filter
+
+
+def _load_vtk_xml_mesh(filename: str) -> Tuple[np.ndarray, List[Element], np.ndarray, vtk.vtkDataSetSurfaceFilter]:
+    reader = vtk.vtkXMLGenericDataObjectReader()
+    reader.SetFileName(filename)
+    reader.Update()
+    output = reader.GetOutput()
+    if output is None:
+        raise ValueError(f"Unable to read mesh from {filename}")
+
+    if isinstance(output, vtk.vtkUnstructuredGrid):
+        surface = convert_unstructureddata_to_polydata(output)
+    elif isinstance(output, vtk.vtkPolyData):
+        surface = output
+    else:
+        raise ValueError(f"Unsupported VTK XML mesh type for {filename}: {type(output)}")
+
+    cell_data = surface.GetCellData()
+    reg_array = cell_data.GetArray("region")
+    if reg_array is None:
+        reg_array = cell_data.GetArray("RegionId")
+
+    elems: List[Element] = []
+    surface.BuildCells()
+    cell_points = surface.GetPolys() if surface.GetPolys() else surface.GetCells()
+    cell_points.InitTraversal()
+    id_list = vtk.vtkIdList()
+    while cell_points.GetNextCell(id_list):
+        npts = id_list.GetNumberOfIds()
+        carp_type = CARP_SURFACE_TYPES.get(npts)
+        if carp_type is None:
+            continue
+        nodes = [id_list.GetId(i) for i in range(npts)]
+        reg_val = reg_array.GetTuple1(len(elems)) if reg_array is not None else 0
+        elems.append(Element(carp_type, nodes, reg_val))
+
+    tot_pts, surface_filter = read_vtk_surface(surface)
+    return tot_pts, elems, tot_pts, surface_filter
+
+
+def _load_fenics_xml_mesh(filename: str) -> Tuple[np.ndarray, List[Element], np.ndarray, vtk.vtkDataSetSurfaceFilter]:
     tree = ET.parse(filename)
     root = tree.getroot()
 
@@ -145,23 +245,50 @@ def _load_fenics_xml_mesh(filename: str) -> Tuple[np.ndarray, List[Element], np.
         reg_val = int(cell.attrib.get("region", cell.attrib.get("physicalEntity", 0)))
         elems.append(Element(carp_type, nodes, reg_val))
 
-    adjacency = build_adjacency(elems, pts)
-    return pts, elems, pts, adjacency
+    polydata = vtk.vtkPolyData()
+    vtk_points = vtk.vtkPoints()
+    for p in pts:
+        vtk_points.InsertNextPoint(*p)
+    polydata.SetPoints(vtk_points)
+
+    polys = vtk.vtkCellArray()
+    for elem in elems:
+        id_list = vtk.vtkIdList()
+        id_list.SetNumberOfIds(len(elem.n))
+        for i, nid in enumerate(elem.n):
+            id_list.SetId(i, int(nid))
+        polys.InsertNextCell(id_list)
+    polydata.SetPolys(polys)
+
+    tot_pts, surface_filter = build_surface_filter_from_polydata(polydata)
+    return pts, elems, tot_pts, surface_filter
 
 
-def read_xml_mesh(filename: str) -> Tuple[np.ndarray, List[Element], np.ndarray, Dict[int, list]]:
-    """Read an atrial surface mesh stored as a DOLFIN/FEniCS XML file."""
+def read_xml_mesh(filename: str) -> Tuple[np.ndarray, List[Element], np.ndarray, vtk.vtkDataSetSurfaceFilter]:
+    """Read an atrial surface mesh stored as an XML file.
 
-    return _load_fenics_xml_mesh(filename)
+    The loader supports VTK XML PolyData/UnstructuredGrid files as well as
+    the DOLFIN/FEniCS legacy XML mesh layout.
+    """
+
+    try:
+        return _load_vtk_xml_mesh(filename)
+    except Exception:
+        return _load_fenics_xml_mesh(filename)
 
 
-def read_carp_mesh(base_dir: str, mesh_name: str) -> Tuple[np.ndarray, List[Element], np.ndarray, Dict[int, list]]:
+def read_carp_mesh(base_dir: str, mesh_name: str) -> Tuple[np.ndarray, List[Element], np.ndarray, vtk.vtkPolyData]:
     mesh_prefix = os.path.join(base_dir, mesh_name)
     pts = read_pts(mesh_prefix)
     elems = read_elem(mesh_prefix)
 
-    adjacency = build_adjacency(elems, pts)
-    return pts, elems, pts, adjacency
+    tmp_file = os.path.join(base_dir, "tmp_uac_core.vtk")
+    write_vtk(pts, elems, tmp_file)
+    surface = get_vtk_from_file(tmp_file)
+    os.remove(tmp_file)
+    surface = convert_unstructureddata_to_polydata(surface)
+    tot_pts, surface_filter = read_vtk_surface(surface)
+    return pts, elems, tot_pts, surface_filter
 
 
 def read_mesh(geometry: str, mesh_name: str | None = None):
@@ -171,6 +298,12 @@ def read_mesh(geometry: str, mesh_name: str | None = None):
         ext = os.path.splitext(geometry)[1].lower()
         if ext == ".xml":
             return read_xml_mesh(geometry)
+        if ext == ".vtk":
+            surface = get_vtk_from_file(geometry)
+            surface = convert_unstructureddata_to_polydata(surface)
+            tot_pts, surface_filter = read_vtk_surface(surface)
+            elems = []
+            return tot_pts, elems, tot_pts, surface_filter
         raise ValueError(f"Unsupported mesh format for {geometry}")
 
     if mesh_name is None:
@@ -277,49 +410,8 @@ def boundary_markers(index1: np.ndarray, index2: np.ndarray, tot_pts: np.ndarray
     return indices[0], indices[1]
 
 
-def build_adjacency(elems: Sequence[Element], pts: np.ndarray) -> Dict[int, list]:
-    """Construct an adjacency list with Euclidean edge weights."""
-
-    adjacency: Dict[int, list] = {}
-    for elem in elems:
-        for edge in elem.edges():
-            n0, n1 = edge.n
-            w = np.linalg.norm(pts[n0] - pts[n1])
-            adjacency.setdefault(n0, []).append((n1, w))
-            adjacency.setdefault(n1, []).append((n0, w))
-    return adjacency
-
-
-def _dijkstra(adjacency: Dict[int, list], start: int, end: int) -> Tuple[float, List[int]]:
-    queue: list[tuple[float, int]] = [(0.0, start)]
-    dist: Dict[int, float] = {start: 0.0}
-    prev: Dict[int, int] = {}
-
-    while queue:
-        d, node = heapq.heappop(queue)
-        if node == end:
-            break
-        if d > dist.get(node, float("inf")):
-            continue
-        for neighbour, weight in adjacency.get(node, []):
-            nd = d + weight
-            if nd < dist.get(neighbour, float("inf")):
-                dist[neighbour] = nd
-                prev[neighbour] = node
-                heapq.heappush(queue, (nd, neighbour))
-
-    if end not in dist:
-        return float("inf"), []
-
-    path = [end]
-    while path[-1] != start:
-        path.append(prev[path[-1]])
-    path.reverse()
-    return dist[end], path
-
-
 def geodesic_between_points(
-    adjacency: Dict[int, list], start: np.ndarray, end: np.ndarray, tot_pts: np.ndarray
+    surface_filter: vtk.vtkDataSetSurfaceFilter, start: np.ndarray, end: np.ndarray, tot_pts: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
     pv_pts = [start, end]
     pts = [None] * 2
@@ -339,25 +431,44 @@ def geodesic_between_points(
     pointd = ((tot_pts - p_end) ** 2).sum(1)
     rspv = find_index(pointd, min)
 
-    _, path_indices = _dijkstra(adjacency, lspv, rspv)
-    mpts = tot_pts[path_indices]
-    return mpts, np.array(path_indices, dtype=int)
+    dijkstra = vtk.vtkDijkstraGraphGeodesicPath()
+    dijkstra.SetInputData(surface_filter.GetOutput())
+    dijkstra.SetStartVertex(lspv)
+    dijkstra.SetEndVertex(rspv)
+    dijkstra.StopWhenEndReachedOn()
+    dijkstra.UseScalarWeightsOff()
+    dijkstra.Update()
+
+    id_len = dijkstra.GetIdList().GetNumberOfIds()
+    indices = np.empty(id_len, int)
+    mpts = np.empty((id_len, 3), float)
+    for i in range(id_len):
+        indices[i] = dijkstra.GetIdList().GetId(id_len - i - 1)
+        mpts[i] = tot_pts[indices[i]]
+    return mpts, indices
 
 
 def geodesic_midpoint_on_boundary(
-    adjacency: Dict[int, list], mid_point: np.ndarray, nodes_la_pv: np.ndarray, increment: int, tot_pts: np.ndarray
+    surface_filter: vtk.vtkDataSetSurfaceFilter, mid_point: np.ndarray, nodes_la_pv: np.ndarray, increment: int, tot_pts: np.ndarray
 ) -> int:
     pointd = ((tot_pts - mid_point) ** 2).sum(1)
-    target_index = find_index(pointd, min)
+    index = find_index(pointd, min)
+
+    dijkstra = vtk.vtkDijkstraGraphGeodesicPath()
+    dijkstra.SetInputData(surface_filter.GetOutput())
+    dijkstra.StopWhenEndReachedOn()
+    dijkstra.UseScalarWeightsOff()
+    dijkstra.SetEndVertex(index)
 
     len_store = []
-    candidates = list(range(0, len(nodes_la_pv), increment))
-    for ep in candidates:
-        _, path = _dijkstra(adjacency, nodes_la_pv[ep], target_index)
-        len_store.append(len(path))
+    for ep in range(0, len(nodes_la_pv), increment):
+        dijkstra.SetStartVertex(nodes_la_pv[ep])
+        dijkstra.Update()
+        len_store.append(dijkstra.GetIdList().GetNumberOfIds())
 
     index = find_index(len_store, max)
-    found_index = nodes_la_pv[candidates[index]]
+    index = list(range(0, len(nodes_la_pv), increment))[index]
+    found_index = nodes_la_pv[index]
     return found_index
 
 
@@ -385,6 +496,12 @@ def extract_subsurface(
         return elems_del
 
     elems_del = element2delete(elems, node_del)
+    tmp_file = os.path.join(base_dir, "tmp_uac_core_subsurface.vtk")
+    write_vtk(pts, elems_del, tmp_file)
+    surface = get_vtk_from_file(tmp_file)
+    os.remove(tmp_file)
+    surface = convert_unstructureddata_to_polydata(surface)
     if return_pts:
-        return pts
-    return build_adjacency(elems_del, pts)
+        tot_pts, _ = read_vtk_surface(surface)
+        return tot_pts
+    return surface
