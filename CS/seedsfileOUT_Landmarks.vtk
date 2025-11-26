@@ -1,0 +1,11 @@
+# vtk DataFile Version 3.0
+Example seeds
+ASCII
+DATASET POLYDATA
+POINTS 4 float
+-0.6 1.1 0.0
+2.6 1.1 0.0
+-0.4 1.4 0.0
+2.4 1.4 0.0
+
+VERTICES 0 0
