@@ -1,0 +1,20 @@
+<mesh celltype="triangle" dim="2">
+  <vertices size="8">
+    <vertex index="0" x="0.0" y="0.0" z="0.0" />
+    <vertex index="1" x="2.0" y="0.0" z="0.0" />
+    <vertex index="2" x="2.0" y="2.0" z="0.0" />
+    <vertex index="3" x="0.0" y="2.0" z="0.0" />
+    <vertex index="4" x="-0.75" y="1.5" z="0.0" />
+    <vertex index="5" x="-0.75" y="0.5" z="0.0" />
+    <vertex index="6" x="2.75" y="1.5" z="0.0" />
+    <vertex index="7" x="2.75" y="0.5" z="0.0" />
+  </vertices>
+  <cells size="6">
+    <triangle index="0" v0="0" v1="1" v2="2" region="11" />
+    <triangle index="1" v0="0" v1="2" v2="3" region="11" />
+    <triangle index="2" v0="3" v1="4" v2="5" region="21" />
+    <triangle index="3" v0="0" v1="5" v2="3" region="23" />
+    <triangle index="4" v0="1" v1="7" v2="2" region="25" />
+    <triangle index="5" v0="2" v1="7" v2="6" region="27" />
+  </cells>
+</mesh>
